@@ -12,6 +12,9 @@ spec:
   ##
   # Create service selector labels here
   ##
+  selector:
+    app: wordpress
+    tier: frontend
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -21,6 +24,8 @@ data:
   ##
   # create non-sensative data attributes
   ##
+  WORDPRESS_DB_HOST: mysql
+  WORDPRESS: wordpress
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -34,7 +39,16 @@ spec:
   ##
   # Create app selector labels here
   ##
+  selector:
+    matchLabels:
+      app: wordpress
+      tier: frontend
+
   template:
+    metadata:
+      labels:
+        app: wordpress
+        tier: frontend
     ##
     # Create metadata labels here
     ##
@@ -47,19 +61,51 @@ spec:
         # mount non-sensitive environment vars from configmap ref
         # WORDPRESS_DB_HOST | WORDPRESS_DB_USER
         ##
+        - name: WORDPRESS_DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: wordpress
+              key: WORDPRESS_DB_HOST
+        - name: WORDPRESS_DB_USER
+          valueFrom:
+            configMapKeyRef:
+              name: wordpress
+              key: WORDPRESS_DB_USER
 
         ##
         # mount sensitive environment vars from secret ref
         # WORDPRESS_DB_PASSWORD (hint use the user-password key)
         ##
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wordpress-secret
+              key: user-password
         ports:
         - containerPort: 80
           name: wordpress
+        volumeMounts:
+        - name: wordpress-persistent-storage
+          mountPath: /var/www/html
       ##
       # define volume mounts here, be sure to reference
       # the PVC in your container spec
       ##
+      volumes:
+      - name: wordpress-persistent-storage
+        persistentVolumeClaim:
+          claimName: wordpress-pvc
 ---
 ##
 # Create persistent volume claim here
 ##
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wordpress-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
