@@ -13,8 +13,8 @@ spec:
   # Create service selector labels here
   ##
   selector:
-    app: wordpress
-    tier: frontend
+      app: wordpress
+      tier: frontend
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -24,8 +24,8 @@ data:
   ##
   # create non-sensative data attributes
   ##
-  WORDPRESS_DB_HOST: mysql
-  WORDPRESS: wordpress
+  host: 'wordpress-mysql'
+  user: 'wordpress'
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -43,15 +43,14 @@ spec:
     matchLabels:
       app: wordpress
       tier: frontend
-
   template:
+    ##
+    # Create metadata labels here
+    ##
     metadata:
       labels:
         app: wordpress
         tier: frontend
-    ##
-    # Create metadata labels here
-    ##
     spec:
       containers:
       - image: wordpress:6.2.1-apache
@@ -65,13 +64,12 @@ spec:
           valueFrom:
             configMapKeyRef:
               name: wordpress
-              key: WORDPRESS_DB_HOST
+              key: host
         - name: WORDPRESS_DB_USER
           valueFrom:
             configMapKeyRef:
               name: wordpress
-              key: WORDPRESS_DB_USER
-
+              key: user
         ##
         # mount sensitive environment vars from secret ref
         # WORDPRESS_DB_PASSWORD (hint use the user-password key)
@@ -79,30 +77,33 @@ spec:
         - name: WORDPRESS_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: wordpress-secret
+              name: database
               key: user-password
         ports:
         - containerPort: 80
           name: wordpress
-        volumeMounts:
-        - name: wordpress-persistent-storage
-          mountPath: /var/www/html
       ##
       # define volume mounts here, be sure to reference
       # the PVC in your container spec
       ##
+        volumeMounts:
+          - mountPath: /var/www/html
+            name: wordpress-pvc
       volumes:
-      - name: wordpress-persistent-storage
+      - name: wordpress-pvc
         persistentVolumeClaim:
-          claimName: wordpress-pvc
----
+          claimName: wp-pv-claim
 ##
 # Create persistent volume claim here
 ##
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: wordpress-pvc
+  name: wp-pv-claim
+  labels:
+    app: wordpress
+    tier: frontend
 spec:
   accessModes:
     - ReadWriteOnce
